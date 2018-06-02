@@ -1,0 +1,2 @@
+- jar files using export in Eclipse
+- exe using the "vbs to exe" program 
