@@ -186,7 +186,7 @@ public class Main extends JFrame {
 		JComboBox cboJaar = new JComboBox();
 		JComboBox cboMaand = new JComboBox();
 
-		cboJaar.setModel(new DefaultComboBoxModel(new String[] { "2015", "2016", "2017", "2018", "2019", "2020" }));
+		cboJaar.setModel(new DefaultComboBoxModel(new String[] { "2020", "2021", "2022", "2023", "2024" }));
 		String year = LocalDateTime.now().getYear() + "";
 		cboJaar.setSelectedItem(year);
 
