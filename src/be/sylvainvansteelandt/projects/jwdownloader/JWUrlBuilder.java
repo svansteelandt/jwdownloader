@@ -5,7 +5,7 @@ public class JWUrlBuilder {
 	public static String[] getPossiblePublicationURLs(String language, String publication, String year, String month){
 		String[] urls = new String[256];
 		
-		String fixedpart = "http://download-a.akamaihd.net/files/media_magazines/";
+		String fixedpart = "https://download-a.akamaihd.net/files/media_periodical/";
 		String pubcode = "";
 		String langcode = "";
 		String monthcode = "";
