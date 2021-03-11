@@ -2,4 +2,4 @@
 
 ## Instructions
 
-- Put jmtp.dll in: C:\ddl\jmtp.dll 
+- Put jmtp.dll in: C:\dll\jmtp.dll 
