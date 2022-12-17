@@ -17,7 +17,7 @@ import org.apache.commons.lang3.StringUtils;
 
 public class JWUrlDownloader {
 
-	private static boolean urlExists(String url) {
+	public static boolean urlExists(String url) {
 		URL u;
 		try {
 			u = new URL(url);
@@ -51,39 +51,6 @@ public class JWUrlDownloader {
 		} catch (IOException e) {
 			return false;
 		}
-	}
-
-	public static String findExistingURL(String[] urls) {
-		
-		Optional<String> result = Stream.of(urls).parallel().filter( url -> urlExists(url) == true).findFirst();
-		
-		if(result.isPresent()){
-			return result.get();
-		} else {
-			return null;
-		}
-	}
-
-	public static void downloadURL(String url, String destination) {
-		try {
-			FileUtils.copyURLToFile(new URL(url), new File(destination));
-		} catch (IOException e) {
-			System.out.println("error");
-		}
-	}
-
-	public static String downloadUsingNIO(String urlStr) throws IOException {
-		URL url = new URL(urlStr);
-		
-		HttpURLConnection huc = (HttpURLConnection) url.openConnection();
-		huc.setRequestMethod("GET");
-		String home = System.getProperty("user.home");
-		String filename = StringUtils.substringBetween(huc.getHeaderField("Content-Disposition"), "\"", "\"");
-		File destinationFile = new File(home + "/Downloads/" + filename);
-		
-		FileUtils.copyURLToFile(url, destinationFile);
-		
-		return home + "/Downloads/" + filename;
 	}
 
 	public static String downloadFile(String source) throws IOException {

@@ -11,6 +11,7 @@ import javax.swing.border.TitledBorder;
 import javax.swing.text.DefaultCaret;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
 import org.farng.mp3.MP3File;
 import org.farng.mp3.TagException;
 
@@ -28,6 +29,12 @@ import javax.swing.UIManager;
 import java.awt.SystemColor;
 import java.text.Normalizer;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import java.awt.Dimension;
 import javax.swing.JComboBox;
 import javax.swing.DefaultComboBoxModel;
@@ -35,6 +42,8 @@ import java.awt.event.ActionListener;
 import java.io.File;
 import java.io.IOException;
 import java.math.BigInteger;
+import java.net.URL;
+import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -48,12 +57,6 @@ public class Main extends JFrame {
 	 * 
 	 */
 	private static final long serialVersionUID = 1L;
-	private String[] allMonths = new String[] { "januari", "februari", "maart", "april", "mei", "juni", "juli",
-			"augustus", "september", "oktober", "november", "december" };
-	private String[] monthsOntwaakt = new String[] { "februari", "april", "juni", "augustus", "oktober", "december" };
-	private String[] monthsPubliek = new String[] { "januari", "maart", "mei", "juli", "september", "november" };
-	private String[] monthsOntwaakt2018 = new String[] {"maart", "juli", "november"};
-	private String[] monthsPubliek2018 = new String[] {"januari", "mei", "september"};
 	
 	private JPanel contentPane;
 	private PortableDeviceManager manager = new PortableDeviceManager();
@@ -186,7 +189,7 @@ public class Main extends JFrame {
 		JComboBox cboJaar = new JComboBox();
 		JComboBox cboMaand = new JComboBox();
 
-		cboJaar.setModel(new DefaultComboBoxModel(new String[] { "2020", "2021", "2022", "2023", "2024" }));
+		cboJaar.setModel(new DefaultComboBoxModel(new String[] { "2021", "2022", "2023", "2024", "2025" }));
 		String year = LocalDateTime.now().getYear() + "";
 		cboJaar.setSelectedItem(year);
 
@@ -206,8 +209,14 @@ public class Main extends JFrame {
 		lblPublicatie.setBounds(10, 56, 77, 14);
 		pnlOptions.add(lblPublicatie);
 
-		cboTaal.setModel(new DefaultComboBoxModel(new String[] { "Engels", "Frans", "Nederlands" }));
+		cboTaal.setModel(new DefaultComboBoxModel(new String[] { "Engels", "Frans", "Nederlands" }));		
 		cboTaal.setSelectedIndex(1);
+		cboTaal.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent arg0) {
+				cboMaand.setModel(new DefaultComboBoxModel(
+						checkMonths(cboPublicatie.getSelectedItem().toString(), cboJaar.getSelectedItem().toString(), cboTaal.getSelectedItem().toString())));
+			}			
+		});
 		lblTaal.setLabelFor(cboTaal);
 		cboTaal.setBounds(108, 21, 123, 20);
 		pnlOptions.add(cboTaal);
@@ -215,11 +224,10 @@ public class Main extends JFrame {
 		cboPublicatie.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
 				cboMaand.setModel(new DefaultComboBoxModel(
-						checkMonths(cboPublicatie.getSelectedItem().toString(), cboJaar.getSelectedItem().toString())));
+						checkMonths(cboPublicatie.getSelectedItem().toString(), cboJaar.getSelectedItem().toString(), cboTaal.getSelectedItem().toString())));
 			}
 		});
-		cboPublicatie
-				.setModel(new DefaultComboBoxModel(new String[] { "Ontwaakt!", "Wachttoren", "Wachttoren Studie" }));
+		cboPublicatie.setModel(new DefaultComboBoxModel(new String[] { "Ontwaakt!", "Wachttoren", "Wachttoren Studie" }));
 		cboPublicatie.setSelectedIndex(0);
 		cboPublicatie.setBounds(108, 53, 123, 20);
 		pnlOptions.add(cboPublicatie);
@@ -242,23 +250,26 @@ public class Main extends JFrame {
 
 		cboJaar.setBounds(382, 21, 123, 20);
 		cboJaar.addActionListener(new ActionListener() {
-
-			@Override
 			public void actionPerformed(ActionEvent e) {
 				cboMaand.setModel(new DefaultComboBoxModel(
-						checkMonths(cboPublicatie.getSelectedItem().toString(), cboJaar.getSelectedItem().toString())));
+						checkMonths(cboPublicatie.getSelectedItem().toString(), cboJaar.getSelectedItem().toString(), 
+									cboTaal.getSelectedItem().toString())));
 			}
 		});
 		pnlOptions.add(cboJaar);
+		
 		cboMaand.setBounds(382, 53, 123, 20);
 		String month = LocalDateTime.now().getMonth() + "";
 		cboMaand.setModel(new DefaultComboBoxModel(
-				checkMonths(cboPublicatie.getSelectedItem().toString(), cboJaar.getSelectedItem().toString())));
+				checkMonths(cboPublicatie.getSelectedItem().toString(), cboJaar.getSelectedItem().toString(), 
+							cboTaal.getSelectedItem().toString())));
 		pnlOptions.add(cboMaand);
 		
 		JTextArea txtOutput = new JTextArea();
 		txtOutput.setEditable(false);
 		txtOutput.setBounds(10, 321, 709, 123);
+		txtOutput.setWrapStyleWord(true);
+		txtOutput.setLineWrap(true);
 		contentPane.add(txtOutput);
 		
 		JScrollPane scpOutput = new JScrollPane(txtOutput);
@@ -279,11 +290,31 @@ public class Main extends JFrame {
 				
 				txtOutput.setText(txtOutput.getText() + "U koos ervoor om volgende publicatie te downloaden: de "
 						+ publicatie + " van " + maand + " " + jaar + ", in het " + taal + ".\n");
-				txtOutput.setText(txtOutput.getText() + "De applicatie zoekt naar de URL van het ZIP-bestand...\n");
-				String[] urls = JWUrlBuilder.getPossiblePublicationURLs(taal, publicatie, jaar, maand);
+				String pubAllMediaUrl = JWUrlBuilder.getPublicationMediaUrl(taal, publicatie, jaar, maand);
+				txtOutput.setText(txtOutput.getText() + "De applicatie zoekt naar de URL van het MP3.ZIP-bestand via de publicatie media URL " + pubAllMediaUrl + ".\n");
+				
 				Runnable task = () -> {
-					String url = JWUrlDownloader.findExistingURL(urls);
-					txtOutput.setText(txtOutput.getText() + "Het ZIP-bestand is gevonden! De url is: " + url + ".\n");
+					String json;
+					try {
+						json = IOUtils.toString(new URL(pubAllMediaUrl), Charset.forName("UTF-8"));
+					} catch (Exception e) {
+						txtOutput.setText(txtOutput.getText() + "De publicatie media info kon niet geladen worden via " + pubAllMediaUrl + ". Foutbericht: " + e.getLocalizedMessage() + ".\n");
+						return;
+					}
+					
+					String url = null;
+					Pattern pattern = Pattern.compile("\\\"[^\\\"]*mp3.zip\\\"", Pattern.CASE_INSENSITIVE);
+					Matcher matcher = pattern.matcher(json);
+					if(matcher.find()) {
+						url = JWUtility.removeStartingTrailingQuotes(matcher.group());
+					}
+					
+					if(url == null) {
+						txtOutput.setText(txtOutput.getText() + "Er kon geen MP3.ZIP-bestand gevonden worden in de publicatie media info ingeladen via " + pubAllMediaUrl + ".\n");
+						return;
+					} else {
+						txtOutput.setText(txtOutput.getText() + "Het MP3.ZIP-bestand is gevonden! De url is: " + url + ".\n");
+					}				
 					try {
 						String filename = JWUrlDownloader.downloadFile(url);
 						txtOutput.setText(txtOutput.getText() + "Het ZIP-bestand werd gedownload naar " + filename + ".\n");
@@ -296,6 +327,9 @@ public class Main extends JFrame {
 						File dir = new File(newPath.replace(".zip", ""));
 						txtOutput.setText(txtOutput.getText() + "Het ZIP-bestand werd uitgepakt naar " + dir + ".\n");
 						File[] directoryListing = dir.listFiles();
+						while(directoryListing.length > 0 && directoryListing[0].isDirectory()) {
+							directoryListing = directoryListing[0].listFiles();
+						}
 						for (File file : directoryListing) {
 							String[] parts = file.getName().split("\\.");
 							int i = parts[0].length();
@@ -323,6 +357,12 @@ public class Main extends JFrame {
 							} 
 						}
 						
+						if(player == null) {
+							txtOutput.setText(txtOutput.getText() + "Er werd geen verbonden MP3-speler gedetecteerd, kan niet verder.\n");
+							cleanup(txtOutput, newPath, dir);
+							return;
+						}
+						
 						PortableDeviceStorageObject storage = getStorage(player);
 						
 						PortableDeviceFolderObject folder = storage.createFolderObject(publicatie.replace("!","") + " " + maand + " " + jaar);
@@ -330,7 +370,9 @@ public class Main extends JFrame {
 						File[] newDirectoryListing = dir.listFiles();
 						
 						for(File file : newDirectoryListing){
-							folder.addAudioObject(file, "", "", new BigInteger("1000"));
+							if(file.isDirectory() == false) {
+								folder.addAudioObject(file, "", "", new BigInteger("1000"));
+							}
 						}
 						
 						txtOutput.setText(txtOutput.getText() + "Het overzetten van MP3-bestanden naar de MP3-speler is klaar.\n");
@@ -343,12 +385,7 @@ public class Main extends JFrame {
 						txtOutput.setText(txtOutput.getText() + "Het plaatsen van de " + publicatie + " " + maand + " " + jaar + " op uw MP3-speler is voltooid!\n");
 						
 						//Clean up
-						Files.deleteIfExists(Paths.get(newPath));
-						txtOutput.setText(txtOutput.getText() + "Tijdelijk bestand opgeruimd: " + newPath + ".\n");
-						if(Files.exists(Paths.get(dir.toString()))) {
-							FileUtils.deleteDirectory(dir);
-						}
-						txtOutput.setText(txtOutput.getText() + "Tijdelijke map opgeruimd: " + dir.toString() + ".\n");
+						cleanup(txtOutput, newPath, dir);
 						
 					} catch (IOException e) {
 						System.out.println("error");
@@ -389,29 +426,31 @@ public class Main extends JFrame {
 		return null;
 	}
 
-	private String[] checkMonths(String publication, String year) {
-		if (publication.equalsIgnoreCase("Ontwaakt!")) {
-			if (Integer.parseInt(year) >= 2018) {
-				return this.monthsOntwaakt2018;
-			} else if (Integer.parseInt(year) > 2015) {
-				return this.monthsOntwaakt;
-			} else {
-				return this.allMonths;
-			}
-		} else if (publication.equalsIgnoreCase("Wachttoren")) {
-			if (Integer.parseInt(year) >= 2018) {
-				return this.monthsPubliek2018;
-			} else if (Integer.parseInt(year) > 2015) {
-				return this.monthsPubliek;
-			} else {
-				return this.allMonths;
-			}
-		} else {
-			if (Integer.parseInt(year) > 2007) {
-				return this.allMonths;
-			} else {
-				return null;
+	private String[] checkMonths(String publication, String year, String language) {
+		ArrayList<String> monthList = new ArrayList<String>();
+		ArrayList<String> urlList = new ArrayList<String>();
+		for(String month : JWUtility.ALL_MONTHS) {
+			String url = JWUrlBuilder.getPublicationMediaUrl(language, publication, year, month);
+			urlList.add(url);
+		}
+		List<String> result = Stream.of(urlList.toArray(new String[0])).parallel().filter( url -> JWUrlDownloader.urlExists(url) == true).collect(Collectors.toList());
+		for(String url : result) {
+			String month = JWUtility.getMonthFromAllMediaUrl(url, year);
+			if(month != null) {
+				monthList.add(month);
 			}
 		}
+		
+		return monthList.toArray(new String[0]);
+	}
+	
+	private void cleanup(JTextArea txtOutput, String newPath, File dir) throws IOException {
+		//Clean up
+		Files.deleteIfExists(Paths.get(newPath));
+		txtOutput.setText(txtOutput.getText() + "Tijdelijk bestand opgeruimd: " + newPath + ".\n");
+		if(Files.exists(Paths.get(dir.toString()))) {
+			FileUtils.deleteDirectory(dir);
+		}
+		txtOutput.setText(txtOutput.getText() + "Tijdelijke map opgeruimd: " + dir.toString() + ".\n");
 	}
 }
