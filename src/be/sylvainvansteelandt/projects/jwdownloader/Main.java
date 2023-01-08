@@ -259,7 +259,6 @@ public class Main extends JFrame {
 		pnlOptions.add(cboJaar);
 		
 		cboMaand.setBounds(382, 53, 123, 20);
-		String month = LocalDateTime.now().getMonth() + "";
 		cboMaand.setModel(new DefaultComboBoxModel(
 				checkMonths(cboPublicatie.getSelectedItem().toString(), cboJaar.getSelectedItem().toString(), 
 							cboTaal.getSelectedItem().toString())));
@@ -302,30 +301,57 @@ public class Main extends JFrame {
 						return;
 					}
 					
-					String url = null;
-					Pattern pattern = Pattern.compile("\\\"[^\\\"]*mp3.zip\\\"", Pattern.CASE_INSENSITIVE);
-					Matcher matcher = pattern.matcher(json);
-					if(matcher.find()) {
-						url = JWUtility.removeStartingTrailingQuotes(matcher.group());
-					}
-					
-					if(url == null) {
-						txtOutput.setText(txtOutput.getText() + "Er kon geen MP3.ZIP-bestand gevonden worden in de publicatie media info ingeladen via " + pubAllMediaUrl + ".\n");
-						return;
-					} else {
-						txtOutput.setText(txtOutput.getText() + "Het MP3.ZIP-bestand is gevonden! De url is: " + url + ".\n");
-					}				
 					try {
-						String filename = JWUrlDownloader.downloadFile(url);
-						txtOutput.setText(txtOutput.getText() + "Het ZIP-bestand werd gedownload naar " + filename + ".\n");
-						Path source = Paths.get(filename);
-						Files.move(source, source.resolveSibling(publicatie.replace("!","") + " " + maand + " " + jaar + ".zip"));
+						
+						String url = null;
+						Pattern pattern = Pattern.compile("\\\"[^\\\"]*mp3.zip\\\"", Pattern.CASE_INSENSITIVE);
+						Matcher matcher = pattern.matcher(json);
+						if(matcher.find()) {
+							url = JWUtility.removeStartingTrailingQuotes(matcher.group());
+						}
+						
+						String newPath = null;
+						File dir = null;
 						String home = System.getProperty("user.home");
-						String newPath = home + "/Downloads/" + publicatie.replace("!","") + " " + maand + " " + jaar + ".zip";
-						txtOutput.setText(txtOutput.getText() + "Het ZIP-bestand werd hernoemd naar " + newPath + ".\n");
-						Compressor.unzip(newPath,"");
-						File dir = new File(newPath.replace(".zip", ""));
-						txtOutput.setText(txtOutput.getText() + "Het ZIP-bestand werd uitgepakt naar " + dir + ".\n");
+						
+						if(url == null) {
+							txtOutput.setText(txtOutput.getText() + "Er kon geen MP3.ZIP-bestand gevonden worden in de publicatie media info ingeladen via " + pubAllMediaUrl + ".\n" +
+																	"Afzonderlijke MP3-bestanden zoeken...\n");
+							pattern = Pattern.compile("\\\"[^\\\"]*\\.mp3\\\"", Pattern.CASE_INSENSITIVE);
+							matcher = pattern.matcher(json);
+							ArrayList<String> urls = new ArrayList<String>();
+							while(matcher.find()) {
+								urls.add(JWUtility.removeStartingTrailingQuotes(matcher.group()));
+							}
+							
+							if(urls.isEmpty()) {
+								txtOutput.setText(txtOutput.getText() + "Er konden ook geen afzonderlijke MP3-bestanden gevonden worden via " + pubAllMediaUrl + ".\n");
+								return;
+							} else {
+								txtOutput.setText(txtOutput.getText() + "Er werden afzonderlijke MP3-bestanden gevonden via " + pubAllMediaUrl + ".\n");
+								String newDir = home + "\\Downloads\\" + publicatie.replace("!", "") + " " + maand + " " + jaar;
+								Files.createDirectories(Paths.get(newDir));
+								txtOutput.setText(txtOutput.getText() + "Een nieuwe tijdelijke map voor het downloaden van de MP3-bestanden werd gemaakt:\n" + newDir + "\n");
+								for(String u : urls) {
+									txtOutput.setText(txtOutput.getText() + "Downloaden van " + u + "...\n");
+									String filename = JWUrlDownloader.downloadAudioFile(u, newDir);
+									txtOutput.setText(txtOutput.getText() + "Het MP3-bestand werd gedownload naar " + filename + ".\n");
+								}
+								dir = new File(newDir);
+							}
+						} else {
+							txtOutput.setText(txtOutput.getText() + "Het MP3.ZIP-bestand is gevonden! De url is: " + url + ".\n");
+							String filename = JWUrlDownloader.downloadFile(url);
+							txtOutput.setText(txtOutput.getText() + "Het ZIP-bestand werd gedownload naar " + filename + ".\n");
+							Path source = Paths.get(filename);
+							Files.move(source, source.resolveSibling(publicatie.replace("!","") + " " + maand + " " + jaar + ".zip"));
+							newPath = home + "\\Downloads\\" + publicatie.replace("!","") + " " + maand + " " + jaar + ".zip";
+							txtOutput.setText(txtOutput.getText() + "Het ZIP-bestand werd hernoemd naar " + newPath + ".\n");
+							Compressor.unzip(newPath,"");
+							dir = new File(newPath.replace(".zip", ""));
+							txtOutput.setText(txtOutput.getText() + "Het ZIP-bestand werd uitgepakt naar " + dir + ".\n");
+						}
+						
 						File[] directoryListing = dir.listFiles();
 						while(directoryListing.length > 0 && directoryListing[0].isDirectory()) {
 							directoryListing = directoryListing[0].listFiles();
@@ -446,8 +472,11 @@ public class Main extends JFrame {
 	
 	private void cleanup(JTextArea txtOutput, String newPath, File dir) throws IOException {
 		//Clean up
-		Files.deleteIfExists(Paths.get(newPath));
-		txtOutput.setText(txtOutput.getText() + "Tijdelijk bestand opgeruimd: " + newPath + ".\n");
+		if(newPath != null) {
+			Files.deleteIfExists(Paths.get(newPath));
+			txtOutput.setText(txtOutput.getText() + "Tijdelijk bestand opgeruimd: " + newPath + ".\n");
+		}
+
 		if(Files.exists(Paths.get(dir.toString()))) {
 			FileUtils.deleteDirectory(dir);
 		}

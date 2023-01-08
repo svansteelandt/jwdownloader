@@ -10,6 +10,8 @@ import java.net.MalformedURLException;
 import java.net.ProtocolException;
 import java.net.URL;
 
+import org.apache.commons.io.FilenameUtils;
+
 public class JWUrlDownloader {
 
 	public static boolean urlExists(String url) {
@@ -61,7 +63,6 @@ public class JWUrlDownloader {
 		HttpURLConnection huc = (HttpURLConnection) url.openConnection();
 		huc.setRequestMethod("GET");
 		String home = System.getProperty("user.home");
-		//String filename = StringUtils.substringBetween(huc.getHeaderField("Content-Disposition"), "\"", "\"");
 		String filename = "temp.zip";
 		File destinationFile = new File(home + "\\Downloads\\" + filename);
 		FileOutputStream fos = new FileOutputStream(destinationFile);
@@ -82,6 +83,40 @@ public class JWUrlDownloader {
 		bos.close();
 		
 		return home + "\\Downloads\\" + filename;
+	}
+	
+	public static String downloadAudioFile(String source, String destinationDir) throws IOException {
+		// initialize local vars
+		int dataread = 0;
+		int CHUNK_SIZE = 8192; // TCP/IP packet size
+		byte[] dataChunk = new byte[CHUNK_SIZE]; // byte array for storing
+													// temporary data.
+
+		// create file and stream to write the file (throws IOException)
+
+		URL url = new URL(source);
+		HttpURLConnection huc = (HttpURLConnection) url.openConnection();
+		huc.setRequestMethod("GET");
+		String filename = FilenameUtils.getName(url.getPath());
+		String newPath = destinationDir + "\\" + filename;
+		File destinationFile = new File(newPath);
+		FileOutputStream fos = new FileOutputStream(destinationFile);
+		BufferedOutputStream bos = new BufferedOutputStream(fos);
+
+		BufferedInputStream bis = new BufferedInputStream(huc.getInputStream());
+
+		while (dataread >= 0) {
+			dataread = bis.read(dataChunk, 0, CHUNK_SIZE);
+			// only write out if there is data to be read
+			if (dataread > 0)
+				bos.write(dataChunk, 0, dataread);
+		}
+
+		// don't forget to close the streams
+		bis.close();
+		bos.close();
+		
+		return newPath;
 	}
 
 }
