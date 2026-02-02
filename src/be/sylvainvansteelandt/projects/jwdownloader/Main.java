@@ -189,9 +189,13 @@ public class Main extends JFrame {
 		JComboBox cboJaar = new JComboBox();
 		JComboBox cboMaand = new JComboBox();
 
-		cboJaar.setModel(new DefaultComboBoxModel(new String[] { "2021", "2022", "2023", "2024", "2025" }));
-		String year = LocalDateTime.now().getYear() + "";
-		cboJaar.setSelectedItem(year);
+		int currentYear = java.time.LocalDate.now().getYear();
+		cboJaar.setModel(new DefaultComboBoxModel<>(
+		    java.util.stream.IntStream.rangeClosed(currentYear - 4, currentYear + 2)
+		        .mapToObj(String::valueOf)
+		        .toArray(String[]::new)
+		));
+		cboJaar.setSelectedItem(currentYear + "");
 
 		lblTaal.setSize(new Dimension(164, 14));
 		lblTaal.setHorizontalAlignment(SwingConstants.LEFT);
